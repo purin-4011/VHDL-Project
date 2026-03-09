@@ -11,7 +11,7 @@ entity sevenseg_driver is
         digit_1    : in  STD_LOGIC_VECTOR(3 downto 0);
         digit_2    : in  STD_LOGIC_VECTOR(3 downto 0);
         cursor_pos : in  STD_LOGIC_VECTOR(1 downto 0);
-        msg_sel    : in  STD_LOGIC_VECTOR(2 downto 0);
+        msg_sel    : in  STD_LOGIC_VECTOR(3 downto 0); 
         seg        : out STD_LOGIC_VECTOR(6 downto 0);
         an         : out STD_LOGIC_VECTOR(3 downto 0)
     );
@@ -26,7 +26,7 @@ architecture Behavioral of sevenseg_driver is
     signal blink_cnt : integer range 0 to BLINK_MAX := 0;
     signal blink_state : std_logic := '0';
 
-    signal current_data : STD_LOGIC_VECTOR(3 downto 0);
+    signal char_code : integer range 0 to 31 := 0;
     signal hide_digit : std_logic := '0';
 begin
     process(clk, rst)
@@ -56,20 +56,21 @@ begin
     begin
         hide_digit <= '0';
         an <= "1111";
+        char_code <= 24; 
         
-        if msg_sel = "000" then 
+        if msg_sel = "0000" then 
             case scan_idx is
                 when 0 => 
-                    current_data <= digit_0; an <= "1110";
+                    char_code <= to_integer(unsigned(digit_0)); an <= "1110";
                     if cursor_pos = "00" and blink_state = '1' then hide_digit <= '1'; end if;
                 when 1 => 
-                    current_data <= digit_1; an <= "1101";
+                    char_code <= to_integer(unsigned(digit_1)); an <= "1101";
                     if cursor_pos = "01" and blink_state = '1' then hide_digit <= '1'; end if;
                 when 2 => 
-                    current_data <= digit_2; an <= "1011";
+                    char_code <= to_integer(unsigned(digit_2)); an <= "1011";
                     if cursor_pos = "10" and blink_state = '1' then hide_digit <= '1'; end if;
                 when 3 => 
-                    current_data <= "1111"; an <= "0111"; 
+                    char_code <= 24; an <= "0111"; 
                     hide_digit <= '1';
                 when others => null;
             end case;
@@ -77,49 +78,68 @@ begin
             an <= (others => '1');
             an(scan_idx) <= '0';
             case msg_sel is
-                when "001" => 
-                    if scan_idx=3 then current_data <= x"A"; 
-                    elsif scan_idx=2 then current_data <= x"B"; 
-                    elsif scan_idx=1 then current_data <= x"C"; 
-                    else current_data <= x"D"; end if; 
-                when "010" =>
-                    if scan_idx=3 then current_data <= x"B"; 
-                    elsif scan_idx=2 or scan_idx=1 then current_data <= x"A"; 
+                when "0001" => 
+                    if scan_idx=3 then char_code <= 16;      
+                    elsif scan_idx=2 then char_code <= 14;   
+                    elsif scan_idx=1 then char_code <= 10;   
+                    else char_code <= 13; end if;            
+                when "0010" => 
+                    if scan_idx=3 then char_code <= 14;      
+                    elsif scan_idx=2 or scan_idx=1 then char_code <= 16; 
                     else hide_digit <= '1'; end if;
-                when "011" =>
-                    if scan_idx=1 then current_data <= x"E"; 
-                    elsif scan_idx=0 then current_data <= x"1"; 
+                when "0011" => 
+                    if scan_idx=2 then char_code <= 5;       
+                    elsif scan_idx=0 then char_code <= to_integer(unsigned(digit_0));
                     else hide_digit <= '1'; end if;
-                when "100" =>
-                    if scan_idx=1 then current_data <= x"E"; 
-                    elsif scan_idx=0 then current_data <= x"2"; 
+                when "0100" => 
+                    if scan_idx=2 then char_code <= 12;      
+                    elsif scan_idx=0 then char_code <= to_integer(unsigned(digit_0));
+                    else hide_digit <= '1'; end if;
+                when "0101" => 
+                    if scan_idx=2 then char_code <= 18;      
+                    elsif scan_idx=1 then char_code <= 19;   
+                    elsif scan_idx=0 then char_code <= 20;   
+                    else hide_digit <= '1'; end if;
+                when "0110" => 
+                    if scan_idx=2 then char_code <= 18;      
+                    elsif scan_idx=1 then char_code <= 1;    
+                    elsif scan_idx=0 then char_code <= 14;   
+                    else hide_digit <= '1'; end if;
+                when "0111" => 
+                    if scan_idx=2 then char_code <= 22;      
+                    elsif scan_idx=1 then char_code <= 23;   
                     else hide_digit <= '1'; end if;
                 when others => hide_digit <= '1';
             end case;
         end if;
     end process;
 
-    process(current_data, hide_digit)
+    process(char_code, hide_digit)
     begin
         if hide_digit = '1' then
             seg <= "1111111"; 
         else
-            case current_data is
-                when x"0" => seg <= "1000000"; 
-                when x"1" => seg <= "1111001"; 
-                when x"2" => seg <= "0100100"; 
-                when x"3" => seg <= "0110000"; 
-                when x"4" => seg <= "0011001"; 
-                when x"5" => seg <= "0010010"; 
-                when x"6" => seg <= "0000010"; 
-                when x"7" => seg <= "1111000"; 
-                when x"8" => seg <= "0000000"; 
-                when x"9" => seg <= "0010000"; 
-                when x"A" => seg <= "0101111"; 
-                when x"B" => seg <= "0000110"; 
-                when x"C" => seg <= "0001000"; 
-                when x"D" => seg <= "0100001"; 
-                when x"E" => seg <= "1000110"; 
+            case char_code is
+                when 0 => seg <= "1000000"; 
+                when 1 => seg <= "1111001"; 
+                when 2 => seg <= "0100100"; 
+                when 3 => seg <= "0110000"; 
+                when 4 => seg <= "0011001"; 
+                when 5 => seg <= "0010010"; 
+                when 6 => seg <= "0000010"; 
+                when 7 => seg <= "1111000"; 
+                when 8 => seg <= "0000000"; 
+                when 9 => seg <= "0010000"; 
+                when 10 => seg <= "0001000"; 
+                when 12 => seg <= "1000110"; 
+                when 13 => seg <= "0100001"; 
+                when 14 => seg <= "0000110"; 
+                when 16 => seg <= "0101111"; 
+                when 18 => seg <= "0000111"; 
+                when 19 => seg <= "1000000"; 
+                when 20 => seg <= "0001100"; 
+                when 22 => seg <= "0101011"; 
+                when 23 => seg <= "0100011"; 
                 when others => seg <= "1111111";
             end case;
         end if;
